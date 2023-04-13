@@ -7,7 +7,7 @@
 #include <chunkattr.h>
 
 #define CHUNK_METADATA "ChunkMetadata"
-#define CHUNK_SIZE 1000
+#define CHUNK_SIZEE 1000
 #define DIMENSION 1
 
 // Read data from H5 dataset returns empty vector if range not within limits else returns vector filled with Events data
@@ -17,6 +17,7 @@ std::vector<Event> readFromDataset(const char* DATASET_NAME, std::pair<int64_t, 
     hid_t   file, dataset, space, dataspace, s2_tid;
     hsize_t dims_out[DIMENSION];
     herr_t  status;
+    
 
     /*
      * read data from the dataset
@@ -35,7 +36,16 @@ std::vector<Event> readFromDataset(const char* DATASET_NAME, std::pair<int64_t, 
 
     // Get the number of dimensions of the dataspace
     hsize_t ndims = H5Sget_simple_extent_npoints(dataspace_id);
-    // std::cout<<ndims<<std::endl;
+
+    // Get the dataset's creation property list
+    hid_t plist_id = H5Dget_create_plist(dataset);
+
+    // Get the chunk size information
+    hsize_t chunk_dims[1];
+    H5Pget_chunk(plist_id, 1, chunk_dims);
+    long long int CHUNK_SIZE = chunk_dims[0];
+    std::cout<<"chunk size: "<<CHUNK_SIZE<<std::endl;
+
     ChunkAttr* attribute_data = (ChunkAttr *) malloc(ndims * sizeof(ChunkAttr));
 
     // Read the attribute data into the buffer
