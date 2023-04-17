@@ -17,10 +17,30 @@
 #define DIMENSION 1
 #define DATASET_NAMEE "story1"
 #define H5FILE_NAMEE "data.h5"
-#define NUM_OF_TESTS 1000
+#define NUM_OF_TESTS 2000
 
 // temporary result vector
 std::vector<int> result;
+
+// Helper function
+int64_t binarySSearch(ChunkAttr* data, int target, int dataSize) {
+    int64_t left = 0;
+    int64_t right = dataSize - 1;
+    int64_t mid = -1;
+    while (left <= right) {
+        mid = left + (right - left) / 2;
+        if (data[mid].start <= target && target <= data[mid].end) {
+            break;
+        }
+        else if (data[mid].start > target) {
+            right = mid - 1;
+        }
+        else {
+            left = mid + 1;
+        }
+    }
+    return mid;
+}
 
 void testReadFromDataset(const char* DATASET_NAME, std::pair<int64_t, int64_t> range, const char* H5FILE_NAME){
 
@@ -58,31 +78,11 @@ void testReadFromDataset(const char* DATASET_NAME, std::pair<int64_t, int64_t> r
     // Read the attribute data into the buffer
     H5Aread(attribute_id, attribute_type, attribute_data);
 
-    // Print the attribute data
-    // for (int i = 0; i < ndims; i++) {
-    //     std::cout<<attribute_data[i].start<<"\t"<<attribute_data[i].end<<std::endl;
-    // }
 
     std::pair<int64_t, int64_t> chunksToRetrieve = {-1 , -1};
-    hsize_t i = 0;
-    // Find the starting chunk index TODO: implement Binary Search
-    for(i=0 ; i < ndims ; i++){
-        if(attribute_data[i].start <= range.first && attribute_data[i].end >= range.first)
-        {
-            chunksToRetrieve.first = i;
-            break;
-        }
-    }
-    
-    // Find the ending chunk index
-    for( ; i < ndims ; i++){
-        if(attribute_data[i].start <= range.second && attribute_data[i].end >= range.second)
-        {
-            chunksToRetrieve.second = i;
-            break;
-        }
-    }
-    
+    chunksToRetrieve.first = binarySSearch(attribute_data, range.first, ndims);
+    chunksToRetrieve.second = binarySSearch(attribute_data, range.second, ndims);
+
     // Check for the range of requested query of chunks are not found
     if(chunksToRetrieve.second == -1 || chunksToRetrieve.first == -1){
         H5Dclose(dataset);
@@ -92,7 +92,6 @@ void testReadFromDataset(const char* DATASET_NAME, std::pair<int64_t, int64_t> r
         std::cout<<"Couldn't get the chunks\n"<<std::endl;
         return;
     }
-    // std::cout<<chunksToRetrieve.first<<"\t"<<chunksToRetrieve.second<<std::endl;
 
     // Event* eventBuffer = (Event*) malloc((chunksToRetrieve.second - chunksToRetrieve.first + 1) * sizeof(Event));
     Event* eventresult = (Event*) malloc(CHUNK_SIZE * sizeof(Event));

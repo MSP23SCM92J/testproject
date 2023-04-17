@@ -11,6 +11,26 @@
 #define ATTR_MAX "Max"
 #define DIMENSION 1
 
+// Helper function
+int64_t binarySearch(ChunkAttr* data, int target, int dataSize) {
+    int64_t left = 0;
+    int64_t right = dataSize - 1;
+    int64_t mid = -1;
+    while (left <= right) {
+        mid = left + (right - left) / 2;
+        if (data[mid].start <= target && target <= data[mid].end) {
+            break;
+        }
+        else if (data[mid].start > target) {
+            right = mid - 1;
+        }
+        else {
+            left = mid + 1;
+        }
+    }
+    return mid;
+}
+
 // Read data from H5 dataset returns empty vector if range not within limits else returns vector filled with Events data
 std::vector<Event> readFromDataset(const char* DATASET_NAME, std::pair<int64_t, int64_t> range, const char* H5FILE_NAME){
 
@@ -58,23 +78,25 @@ std::vector<Event> readFromDataset(const char* DATASET_NAME, std::pair<int64_t, 
     hsize_t i = 0;
 
     // Find the starting chunk index TODO: implement Binary Search
-    for(i=0 ; i < ndims ; i++){
-        if(attribute_data[i].start <= range.first && attribute_data[i].end >= range.first)
-        {
-            chunksToRetrieve.first = i;
-            break;
-        }
-    }
+    // for(i=0 ; i < ndims ; i++){
+    //     if(attribute_data[i].start <= range.first && attribute_data[i].end >= range.first)
+    //     {
+    //         chunksToRetrieve.first = i;
+    //         break;
+    //     }
+    // }
     
-    // Find the ending chunk index
-    for( ; i < ndims ; i++){
-        if(attribute_data[i].start <= range.second && attribute_data[i].end >= range.second)
-        {
-            chunksToRetrieve.second = i;
-            break;
-        }
-    }
-    
+    // // Find the ending chunk index
+    // for( ; i < ndims ; i++){
+    //     if(attribute_data[i].start <= range.second && attribute_data[i].end >= range.second)
+    //     {
+    //         chunksToRetrieve.second = i;
+    //         break;
+    //     }
+    // }
+    chunksToRetrieve.first = binarySearch(attribute_data, range.first, ndims);
+    chunksToRetrieve.second = binarySearch(attribute_data, range.second, ndims);
+
     // Check for the range of requested query of chunks are not found
     if(chunksToRetrieve.second == -1 || chunksToRetrieve.first == -1){
         H5Dclose(dataset);
