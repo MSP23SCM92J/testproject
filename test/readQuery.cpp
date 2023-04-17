@@ -6,18 +6,26 @@
 #include <string>
 #include <read.h>
 #include <event.h>
+#include<chrono>
 #include <chunkattr.h>
+#include <algorithm>
 
+
+#define ATTR_CHUNKMETADATA "ChunkMetadata"
+#define ATTR_MIN "Min"
+#define ATTR_MAX "Max"
 #define DIMENSION 1
-#define CHUNK_METADATA "ChunkMetadata"
-#define CHUNK_SIZE 1000
 #define DATASET_NAMEE "story1"
 #define H5FILE_NAMEE "data.h5"
+#define NUM_OF_TESTS 1000
 
-void readFromDatasetTest(const char* DATASET_NAME, std::pair<int64_t, int64_t> range, const char* H5FILE_NAME){
+// temporary result vector
+std::vector<int> result;
 
-    std::vector<Event> r1;
-    hid_t   file, dataset, space, dataspace, s2_tid;
+void testReadFromDataset(const char* DATASET_NAME, std::pair<int64_t, int64_t> range, const char* H5FILE_NAME){
+
+    std::vector<Event> resultEvents;
+    hid_t   space, dataspace, s2_tid, file , dataset;
     hsize_t dims_out[DIMENSION];
     herr_t  status;
 
@@ -30,7 +38,7 @@ void readFromDatasetTest(const char* DATASET_NAME, std::pair<int64_t, int64_t> r
     dataspace  = H5Dget_space(dataset);
     status = H5Sget_simple_extent_dims(dataspace, dims_out, NULL);
     // Open the attribute
-    hid_t attribute_id = H5Aopen(dataset, CHUNK_METADATA, H5P_DEFAULT);
+    hid_t attribute_id = H5Aopen(dataset, ATTR_CHUNKMETADATA, H5P_DEFAULT);
 
     // Get the attribute type and dataspace
     hid_t attribute_type = H5Aget_type(attribute_id);
@@ -38,7 +46,13 @@ void readFromDatasetTest(const char* DATASET_NAME, std::pair<int64_t, int64_t> r
 
     // Get the number of dimensions of the dataspace
     hsize_t ndims = H5Sget_simple_extent_npoints(dataspace_id);
-    // std::cout<<ndims<<std::endl;
+
+    // Get the dataset creation property list for chunksize info
+    hid_t plist_id = H5Dget_create_plist(dataset);
+    hsize_t chunk_dims[1];
+    H5Pget_chunk(plist_id, 1, chunk_dims);
+    long long int CHUNK_SIZE = chunk_dims[0];
+
     ChunkAttr* attribute_data = (ChunkAttr *) malloc(ndims * sizeof(ChunkAttr));
 
     // Read the attribute data into the buffer
@@ -51,7 +65,7 @@ void readFromDatasetTest(const char* DATASET_NAME, std::pair<int64_t, int64_t> r
 
     std::pair<int64_t, int64_t> chunksToRetrieve = {-1 , -1};
     hsize_t i = 0;
-    // Find the starting chunk index
+    // Find the starting chunk index TODO: implement Binary Search
     for(i=0 ; i < ndims ; i++){
         if(attribute_data[i].start <= range.first && attribute_data[i].end >= range.first)
         {
@@ -75,10 +89,10 @@ void readFromDatasetTest(const char* DATASET_NAME, std::pair<int64_t, int64_t> r
         H5Fclose(file);
         H5Aclose(attribute_id);
         H5Tclose(attribute_type);
-        std::cout<<"Range of out of limit!"<<std::endl;
+        std::cout<<"Couldn't get the chunks\n"<<std::endl;
         return;
     }
-    std::cout<<chunksToRetrieve.first<<"\t"<<chunksToRetrieve.second<<std::endl;
+    // std::cout<<chunksToRetrieve.first<<"\t"<<chunksToRetrieve.second<<std::endl;
 
     // Event* eventBuffer = (Event*) malloc((chunksToRetrieve.second - chunksToRetrieve.first + 1) * sizeof(Event));
     Event* eventresult = (Event*) malloc(CHUNK_SIZE * sizeof(Event));
@@ -102,13 +116,12 @@ void readFromDatasetTest(const char* DATASET_NAME, std::pair<int64_t, int64_t> r
         memspace = H5Screate_simple(1, slab_size, NULL);
         H5Sselect_hyperslab(memspace, H5S_SELECT_SET, slab_start, NULL, slab_size, NULL);
     }
-
     H5Sselect_hyperslab(dataspace, H5S_SELECT_SET, offset, NULL, slab_size, NULL);
     status = H5Dread(dataset, s2_tid, memspace, dataspace, H5P_DEFAULT, eventresult);
 
     for(hsize_t i = 0 ; i < slab_size[0]; i++ ){
         if(eventresult[i].timeStamp >= range.first && eventresult[i].timeStamp <= range.second){
-            r1.push_back(eventresult[i]);
+            resultEvents.push_back(eventresult[i]);
         }
     }
     free(eventresult);
@@ -123,7 +136,7 @@ void readFromDatasetTest(const char* DATASET_NAME, std::pair<int64_t, int64_t> r
         H5Sselect_hyperslab(dataspace, H5S_SELECT_SET, offset, NULL, slab_size, NULL);
         status = H5Dread(dataset, s2_tid, memspace, dataspace, H5P_DEFAULT, eventresult);
         for(hsize_t i = 0 ; i < slab_size[0]; i++ ){
-            r1.push_back(eventresult[i]);
+            resultEvents.push_back(eventresult[i]);
         }
         free(eventresult);
     }
@@ -144,7 +157,7 @@ void readFromDatasetTest(const char* DATASET_NAME, std::pair<int64_t, int64_t> r
 
         for(hsize_t i = 0 ; i < slab_size[0]; i++ ){
             if(eventresult[i].timeStamp <= range.second){
-                r1.push_back(eventresult[i]);
+                resultEvents.push_back(eventresult[i]);
             }
             else{
                 break;
@@ -163,45 +176,64 @@ void readFromDatasetTest(const char* DATASET_NAME, std::pair<int64_t, int64_t> r
     H5Tclose(s2_tid);
     H5Dclose(dataset);
     H5Fclose(file);
-    std::cout << r1[0].timeStamp << "\t" << r1[r1.size()-1].timeStamp << std::endl;
+    
+    // return resultEvents;
+    // std::cout << resultEvents[0].timeStamp << "\t" << resultEvents[resultEvents.size()-1].timeStamp << std::endl;
+    if(resultEvents[0].timeStamp == range.first && resultEvents[resultEvents.size()-1].timeStamp == range.second){
+        result.push_back(1);
+    }
+    else{
+        result.push_back(0);
+    }
     return ;
 }
 
-void multiple_reads() {
+void testReadOperation() {
 
     // Define the read requests
     std::vector<std::pair<int64_t, int64_t>> range;
-    range.push_back(std::make_pair(3648370892136757, 1404136432139944952)); // First chunk
-    range.push_back(std::make_pair(1099185, 1099990)); // Last chunk
-    range.push_back(std::make_pair(1110000, 1111000)); // Beyond last chunk
-    range.push_back(std::make_pair(1080000, 1081000)); // Beyond first chunk
-    range.push_back(std::make_pair(1094691, 1110000)); // First within range and second out of range
-    range.push_back(std::make_pair(1094691, 1099999)); // First within range second last chunk last event timestamp
-    range.push_back(std::make_pair(1094691, 1099175)); // First within range second last chunk
+    std::pair<__uint64_t, __uint64_t> minMaxRange = readDatasetRange(DATASET_NAMEE, H5FILE_NAMEE);
+    std::cout<<"Min: "<<minMaxRange.first<<" Max: "<<minMaxRange.second<<std::endl;
+
+    for(int64_t i = 0 ; i < NUM_OF_TESTS ; i++){
+
+        auto seed = std::chrono::system_clock::now().time_since_epoch().count();
+        srand(seed);
+
+        int64_t start_val = rand() % (minMaxRange.second - minMaxRange.first + 1) + minMaxRange.first;
+        int64_t end_val = rand() % (minMaxRange.second - start_val + 1) + start_val;
+
+        // std::cout << start_val << " " << end_val << std::endl;
+        range.push_back(std::make_pair(start_val, end_val));
+    }
+
+    auto start_time = std::chrono::high_resolution_clock::now();
 
     // Create threads for each read request
     std::vector<std::thread> threads;
+    // hid_t file = H5Fopen(H5FILE_NAMEE, H5F_ACC_RDONLY, H5P_DEFAULT);
+    // hid_t dataset = H5Dopen2(file, DATASET_NAMEE, H5P_DEFAULT);
+
     for (std::pair<int64_t, int64_t> req : range) {
-        threads.emplace_back(readFromDatasetTest, "story1", req, "data.h5");
-        // std::cout<<req.first<<std::endl;
+        threads.emplace_back(testReadFromDataset, DATASET_NAMEE, req, H5FILE_NAMEE);
     }
 
-    // for(int i=0 ;i<range.size() ;i++){
-    //     std::cout<<"\nExecuting: "<<i+1<<std::endl;
-    //     std::vector<Event> e = readFromDataset(DATASET_NAMEE, range[i], H5FILE_NAMEE);
-    //     if(e.size() == 0){
-    //         std::cout << "Range beyond limits - \tNo output";
-    //         continue;
-    //     }
-    //     std::cout<<range[i].first<<"\t"<<e[0].timeStamp<<std::endl;
-    //     std::cout<<range[i].second<<"\t"<<e[e.size()-1].timeStamp<<std::endl;
-    //     std::cout<<"####################################################\n";
-    // }
 
     // Wait for all threads to finish
     for (auto& thread : threads) {
         thread.join();
     }
+
+    // Calculate the duration in microseconds
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::seconds>(end_time - start_time).count();
+    std::cout << "\nTime taken: " << duration << " seconds\n" << std::endl;
+
+    // Check results of all the test cases
+    if(std::count(result.begin(), result.end(), 1) == result.size()){
+        std::cout<<"All tests successful!"<<std::endl;
+    }
+    else    std::cout<<"Test fail!"<<std::endl;
 
     return ;
 }
