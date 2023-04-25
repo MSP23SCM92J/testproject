@@ -24,7 +24,7 @@ int writeToDataset(const char* FILE_NAME, const char* DATASET_NAME, const char* 
     herr_t  status;
     hsize_t chunk_dims[1] = {CHUNK_SIZE};
     std::vector<Event> temp;
-    int64_t time;
+    __uint64_t time;
     std::string da;
 
     std::ifstream filePointer(FILE_NAME);
@@ -35,45 +35,30 @@ int writeToDataset(const char* FILE_NAME, const char* DATASET_NAME, const char* 
     /*
      * Raw number of events
      */
-    hsize_t numEvents = fileSize / (sizeof(int64_t)+(sizeof(char) * 100));
+    hsize_t numEvents = fileSize / (sizeof(__uint64_t)+(sizeof(char) * 100));
 
-    std::cout<<"Raw number of events: "<<numEvents<<"\n";
     /*
      * Allocate memory for events data
      */
     Event* eventBuffer = (Event*) malloc(numEvents*sizeof(Event));
-    // std::cout<<"Allocate memory for events data: "<<numEvents*sizeof(Event)<<"\n";
+
     /*
-     * Read data from $FILE_NAME file
+     * Read data from file
      */
-    unsigned long long iterator = 0;
+    hsize_t iterator = 0;
+
     while (filePointer >> time >> da) {
-        // Event e;
-        // e.timeStamp = time;
-        // strcpy(e.data, da.c_str());
-        // temp.push_back(e);
         eventBuffer[iterator].timeStamp = time;
         strcpy(eventBuffer[iterator].data, da.c_str());
-        // std::cout<<time<<" "<<da<<"\n";
         iterator++;
     }
     filePointer.close();
 
-    // Event* eventBuffer = (Event*) malloc(iterator * sizeof(Event));
-    // std::cout<<"Allocate memory for events data: "<<iterator*sizeof(Event)<<"\n";
-    // for(int i=0 ; i<temp.size() ; i++){
-    //     eventBuffer[i].timeStamp = temp[i].timeStamp;
-    //     // eventBuffer[i].data = temp[i].data;
-    //     strcpy(eventBuffer[i].data, temp[i].data);
-    // }
-    // temp.erase(temp.begin(), temp.end());
-
-    // std::cout<<"Read data from $FILE_NAME file"<<"\n";
+    // std::cout<<"Read data from $FILE_NAME file"<<std::endl;
     /*
      * Create the file
      */
     const hsize_t numberOfEvents = iterator - 1;
-    std::cout<<"numberOfEvents: "<<numberOfEvents<<"\n";
     hsize_t dim[] = {numberOfEvents};
     const hsize_t max_dim[] = {H5S_UNLIMITED};
     file = H5Fcreate(H5FILE_NAME, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
@@ -93,11 +78,13 @@ int writeToDataset(const char* FILE_NAME, const char* DATASET_NAME, const char* 
     // H5Pset_chunk_cache(dcpl_id, rdcc_nslots, rdcc_nbytes, rdcc_w0);
     // delete[] rdcc_w0;
 
+
     /*
      * Create the data space.
      */
     space = H5Screate_simple(DATASET_RANK, dim, max_dim );
-    std::cout<<"Create the data space."<<"\n";
+    // std::cout<<"Create the data space."<<std::endl;
+
     /*
      * Create the memory data type.
      */
@@ -114,7 +101,8 @@ int writeToDataset(const char* FILE_NAME, const char* DATASET_NAME, const char* 
      * Allocate memory for events data
      */
     ChunkAttr* attrBuffer = (ChunkAttr*) malloc(((iterator % CHUNK_SIZE)+1)*sizeof(ChunkAttr));
-    std::cout<<"Allocate memory for events data"<<"\n";
+    // std::cout<<"Allocate memory for events data"<<std::endl;
+
     /*
      * Write data to the dataset using hyperslab
      */
@@ -123,60 +111,63 @@ int writeToDataset(const char* FILE_NAME, const char* DATASET_NAME, const char* 
     hsize_t slab_count[1] = {CHUNK_SIZE};
     mspace = H5Screate_simple(DATASET_RANK, slab_count, NULL);
     status = H5Sselect_hyperslab(mspace, H5S_SELECT_SET, slab_start, NULL, slab_count, NULL);
-    if(status != 0){
-        std::cout<<"Error: "<<status<<"\n";
-    }
-    std::cout<<"Write data to the dataset using hyperslab"<<"\n";
-    // TODO: check the last entry issue
+
+    // std::cout<<"Write data to the dataset using hyperslab"<<std::endl;
+
+    // TODO: check the last entry issue as last entry is exclusive as stated by Inna in github issue
     hsize_t attrcount = 0;
-    hsize_t i = 0;
-    for (i = 0; i < dim[0]; i += CHUNK_SIZE) {
-        space_start[0] = i;
-        if(dim[0] - i < CHUNK_SIZE){
-            slab_count[0] = dim[0] - i;
+    hsize_t iter = 0;
+    for (iter = 0; iter < dim[0]; iter += CHUNK_SIZE) {
+        space_start[0] = iter;
+        if(dim[0] - iter < CHUNK_SIZE){
+            slab_count[0] = dim[0] - iter;
+
             // TODO: check mspace declaration
             mspace = H5Screate_simple(DATASET_RANK, slab_count, NULL);
             status = H5Sselect_hyperslab(mspace, H5S_SELECT_SET, slab_start, NULL, slab_count, NULL);
         }
         status = H5Sselect_hyperslab(space, H5S_SELECT_SET, space_start, NULL, slab_count, NULL);
-        status = H5Dwrite(dataset, s1_tid, mspace, space, H5P_DEFAULT, &eventBuffer[i]);
+        status = H5Dwrite(dataset, s1_tid, mspace, space, H5P_DEFAULT, &eventBuffer[iter]);
 
-        attrBuffer[attrcount].start = eventBuffer[i].timeStamp;
-        attrBuffer[attrcount].end = eventBuffer[i + slab_count[0] - 1].timeStamp;
-        std::cout<<attrBuffer[attrcount].start <<" "<<attrBuffer[attrcount].end<<std::endl;
+        attrBuffer[attrcount].start = eventBuffer[iter].timeStamp;
+        attrBuffer[attrcount].end = eventBuffer[iter + slab_count[0] - 1].timeStamp;
         attrcount++;
     }
-    std::cout<<"Written data"<<"\n";
+    std::cout<<"Written data"<<std::endl;
+
     /*
      * Create dataspace for the ChunkMetadata attribute.
      */
-    hid_t at_tid = H5Tcreate(H5T_COMPOUND, sizeof(ChunkAttr));
-    H5Tinsert(at_tid, "start", HOFFSET(ChunkAttr, start), H5T_NATIVE_INT64);
-    H5Tinsert(at_tid, "end", HOFFSET(ChunkAttr, end), H5T_NATIVE_INT64);
-    hid_t attr;
-    hsize_t adim[] = {attrcount};
+    hid_t at_tid, attr, attr1, min_attr, max_attr;
+    herr_t ret;
 
+    at_tid = H5Tcreate(H5T_COMPOUND, sizeof(ChunkAttr));
+    H5Tinsert(at_tid, "start", HOFFSET(ChunkAttr, start), H5T_NATIVE_ULONG);
+    H5Tinsert(at_tid, "end", HOFFSET(ChunkAttr, end), H5T_NATIVE_ULONG);
+
+    hsize_t adim[] = {attrcount};
     attr = H5Screate(H5S_SIMPLE);
-    herr_t ret  = H5Sset_extent_simple(attr, CHUNK_META_ATTR_RANK, adim, NULL);
-    std::cout<<"Create dataspace for the ChunkMetadata attribute."<<"\n";
+    ret  = H5Sset_extent_simple(attr, CHUNK_META_ATTR_RANK, adim, NULL);
+    std::cout<<"Create dataspace for the ChunkMetadata attribute."<<std::endl;
+
     /*
      * Create array attribute and write array attribute.
      */
-    hid_t attr1 = H5Acreate2(dataset, ATTR_CHUNKMETADATA, at_tid, attr, H5P_DEFAULT, H5P_DEFAULT);
+    attr1 = H5Acreate2(dataset, ATTR_CHUNKMETADATA, at_tid, attr, H5P_DEFAULT, H5P_DEFAULT);
     ret = H5Awrite(attr1, at_tid, attrBuffer);
 
     /*
-     * Create and set Min and Max attribute.
+     * Create and write to Min and Max attribute.
      */
     at_tid = H5Tcreate(H5T_COMPOUND, sizeof(ChunkAttr));
     adim[0] = {1};
     attr = H5Screate_simple(1, adim, NULL);
 
-    hid_t min_attr = H5Acreate2(dataset, ATTR_MIN, H5T_NATIVE_INT64, attr, H5P_DEFAULT, H5P_DEFAULT);
-    ret = H5Awrite(min_attr, H5T_NATIVE_INT64, &eventBuffer[0].timeStamp);
+    min_attr = H5Acreate2(dataset, ATTR_MIN, H5T_NATIVE_ULONG, attr, H5P_DEFAULT, H5P_DEFAULT);
+    ret = H5Awrite(min_attr, H5T_NATIVE_ULONG, &eventBuffer[0].timeStamp);
 
-    hid_t max_attr = H5Acreate2(dataset, ATTR_MAX, H5T_NATIVE_INT64, attr, H5P_DEFAULT, H5P_DEFAULT);
-    ret = H5Awrite(max_attr, H5T_NATIVE_INT64, &eventBuffer[dim[0]-1].timeStamp);
+    max_attr = H5Acreate2(dataset, ATTR_MAX, H5T_NATIVE_ULONG, attr, H5P_DEFAULT, H5P_DEFAULT);
+    ret = H5Awrite(max_attr, H5T_NATIVE_ULONG, &eventBuffer[dim[0]-1].timeStamp);
 
     /*
      * Release resources
@@ -203,7 +194,7 @@ int appendToDataset(const char* FILE_NAME, const char* DATASET_NAME, const char*
     herr_t  status;
     hsize_t chunk_size[1];
 
-    int64_t time;
+    __uint64_t time;
     std::string da;
 
     std::ifstream filePointer(FILE_NAME);
@@ -221,7 +212,7 @@ int appendToDataset(const char* FILE_NAME, const char* DATASET_NAME, const char*
     /*
      * Read data from $FILE_NAME file
      */
-    __int64_t iterator = 0;
+    hsize_t iterator = 0;
     while (filePointer >> time >> da) {
         eventBuffer[iterator].timeStamp = time;
         strcpy(eventBuffer[iterator].data, da.c_str());
@@ -241,7 +232,9 @@ int appendToDataset(const char* FILE_NAME, const char* DATASET_NAME, const char*
     s1_tid = H5Tcreate(H5T_COMPOUND, sizeof(Event));
     H5Tinsert(s1_tid, "timeStamp", HOFFSET(Event, timeStamp), H5T_NATIVE_ULONG);
     H5Tinsert(s1_tid, "data", HOFFSET(Event, data), H5T_NATIVE_CHAR);
-
+    /*
+     * Open file and dataset
+     */
     file = H5Fopen(H5FILE_NAME, H5F_ACC_RDWR, H5P_DEFAULT);
     dataset = H5Dopen2(file, DATASET_NAME, H5P_DEFAULT);
 
@@ -262,10 +255,14 @@ int appendToDataset(const char* FILE_NAME, const char* DATASET_NAME, const char*
     hsize_t new_size[1] = {current_size[0] + dim[0]};
     status = H5Dset_extent(dataset, new_size);
     
-    
+    /* 
+     * Close the dataspace id and dataset
+     */
     H5Sclose(dataspace_id);
     H5Dclose(dataset);
-
+    /* 
+     * Open dataset and get dataspace id again
+     */
     dataset = H5Dopen2(file, DATASET_NAME, H5P_DEFAULT);
     dataspace_id = H5Dget_space(dataset);
     hsize_t _size[1];
@@ -287,12 +284,12 @@ int appendToDataset(const char* FILE_NAME, const char* DATASET_NAME, const char*
 
     // TODO: check the last entry issue
     hsize_t attrcount = 0;
-    hsize_t i = 0;
+    hsize_t iter = 0;
     hsize_t datasize = 0;
-    for (i = current_size[0] ; i < new_size[0] ; i += chunk_size[0]) {
-        space_start[0] = i;
-        if(new_size[0] - i < chunk_size[0]){
-            slab_count[0] = new_size[0] - i;
+    for (iter = current_size[0] ; iter < new_size[0] ; iter += chunk_size[0]) {
+        space_start[0] = iter;
+        if(new_size[0] - iter < chunk_size[0]){
+            slab_count[0] = new_size[0] - iter;
 
             // TODO: check mspace declaration
             mspace = H5Screate_simple(DATASET_RANK, slab_count, NULL);
@@ -317,8 +314,8 @@ int appendToDataset(const char* FILE_NAME, const char* DATASET_NAME, const char*
      * Create dataspace for the ChunkMetadata attribute.
      */
     hid_t at_tid = H5Tcreate(H5T_COMPOUND, sizeof(ChunkAttr));
-    H5Tinsert(at_tid, "start", HOFFSET(ChunkAttr, start), H5T_NATIVE_INT64);
-    H5Tinsert(at_tid, "end", HOFFSET(ChunkAttr, end), H5T_NATIVE_INT64);
+    H5Tinsert(at_tid, "start", HOFFSET(ChunkAttr, start), H5T_NATIVE_ULONG);
+    H5Tinsert(at_tid, "end", HOFFSET(ChunkAttr, end), H5T_NATIVE_ULONG);
 
     /*
      * Open the attribute, get attribute id, type and space
@@ -343,9 +340,10 @@ int appendToDataset(const char* FILE_NAME, const char* DATASET_NAME, const char*
     herr_t ret  = H5Sset_extent_simple(attr, CHUNK_META_ATTR_RANK, adim, NULL);
     hid_t attr1 = H5Acreate2(dataset, ATTR_CHUNKMETADATA, attribute_type, attr, H5P_DEFAULT, H5P_DEFAULT);
 
-    for(int i = 0 ; i < attrcount ; i++ ){
-        attribute_data[ndims+i].start = attrBuffer[i].start;
-        attribute_data[ndims+i].end = attrBuffer[i].end;
+    iter = 0;
+    for(iter = 0 ; iter < attrcount ; iter++ ){
+        attribute_data[ndims+iter].start = attrBuffer[iter].start;
+        attribute_data[ndims+iter].end = attrBuffer[iter].end;
     }
     ret = H5Awrite(attr1, attribute_type, attribute_data);
 
@@ -353,7 +351,7 @@ int appendToDataset(const char* FILE_NAME, const char* DATASET_NAME, const char*
      * Modify MAX attribute
      */
     hid_t attr_id = H5Aopen(dataset, ATTR_MAX, H5P_DEFAULT);
-    H5Awrite(attr_id, H5T_NATIVE_INT64, &attribute_data[adim[0] - 1].end);
+    H5Awrite(attr_id, H5T_NATIVE_ULONG, &attribute_data[adim[0] - 1].end);
 
     /*
      * Release resources

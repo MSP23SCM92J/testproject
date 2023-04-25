@@ -4,7 +4,7 @@
 
 
 typedef struct Event {
-    int64_t timeStamp;
+    __uint64_t timeStamp;
     char data[100];
 } Event;
 

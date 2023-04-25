@@ -4,8 +4,8 @@
 
 
 typedef struct ChunkAttr {
-    int64_t start;
-    int64_t end;
+    __uint64_t start;
+    __uint64_t end;
 }ChunkAttr;
 
 #endif // CHUNK_ATTR_H
