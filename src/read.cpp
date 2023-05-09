@@ -10,12 +10,13 @@
 #define ATTR_MIN "Min"
 #define ATTR_MAX "Max"
 #define DIMENSION 1
+#define DEBUG 0
 
 // Helper function
-int64_t binarySearch(ChunkAttr* data, int target, int dataSize) {
-    int64_t left = 0;
-    int64_t right = dataSize - 1;
-    int64_t mid = -1;
+int64_t binarySearch(ChunkAttr* data, __uint64_t target, __uint64_t dataSize) {
+    __uint64_t left = 0;
+    __uint64_t right = dataSize - 1;
+    __uint64_t mid = -1;
     while (left <= right) {
         mid = left + (right - left) / 2;
         if (data[mid].start <= target && target <= data[mid].end) {
@@ -32,7 +33,12 @@ int64_t binarySearch(ChunkAttr* data, int target, int dataSize) {
 }
 
 // Read data from H5 dataset returns empty vector if range not within limits else returns vector filled with Events data
-std::vector<Event> readFromDataset(const char* DATASET_NAME, std::pair<int64_t, int64_t> range, const char* H5FILE_NAME){
+std::vector<Event> readFromDataset(const char* DATASET_NAME, std::pair<__uint64_t, __uint64_t> range, const char* H5FILE_NAME){
+    
+    // Disable automatic printing of HDF5 error stack
+    if(!DEBUG){
+        H5Eset_auto(H5E_DEFAULT, NULL, NULL);
+    }
 
     std::vector<Event> resultEvents;
     hid_t   file, dataset, space, dataspace, s2_tid;
@@ -72,30 +78,31 @@ std::vector<Event> readFromDataset(const char* DATASET_NAME, std::pair<int64_t, 
 
     std::pair<int64_t, int64_t> chunksToRetrieve = {-1 , -1};
     hsize_t i = 0;
+
     /*
      * Find the starting chunk index
      */
-    for(i=0 ; i < ndims ; i++){
-        if(attribute_data[i].start <= range.first && attribute_data[i].end >= range.first)
-        {
-            chunksToRetrieve.first = i;
-            break;
-        }
-    }
-    /*
-     * Find the ending chunk index
-     */
-    for( ; i < ndims ; i++){
-        if(attribute_data[i].start <= range.second && attribute_data[i].end >= range.second)
-        {
-            chunksToRetrieve.second = i;
-            break;
-        }
-    }
+    // for(i=0 ; i < ndims ; i++){
+    //     if(attribute_data[i].start <= range.first && attribute_data[i].end >= range.first)
+    //     {
+    //         chunksToRetrieve.first = i;
+    //         break;
+    //     }
+    // }
 
-    // chunksToRetrieve.first = binarySearch(attribute_data, range.first, ndims);
-    // chunksToRetrieve.second = binarySearch(attribute_data, range.second, ndims);
-    // std::cout<<chunksToRetrieve.first<<" "<<chunksToRetrieve.second<<std::endl;
+    // /*
+    //  * Find the ending chunk index
+    //  */
+    // for( ; i < ndims ; i++){
+    //     if(attribute_data[i].start <= range.second && attribute_data[i].end >= range.second)
+    //     {
+    //         chunksToRetrieve.second = i;
+    //         break;
+    //     }
+    // }
+
+    chunksToRetrieve.first = binarySearch(attribute_data, range.first, ndims);
+    chunksToRetrieve.second = binarySearch(attribute_data, range.second, ndims);
 
 
     /*
@@ -108,9 +115,7 @@ std::vector<Event> readFromDataset(const char* DATASET_NAME, std::pair<int64_t, 
         H5Tclose(attribute_type);
         return resultEvents;
     }
-    // std::cout<<chunksToRetrieve.first<<"\t"<<chunksToRetrieve.second<<std::endl;
-
-    // Event* eventBuffer = (Event*) malloc((chunksToRetrieve.second - chunksToRetrieve.first + 1) * sizeof(Event));
+    
     Event* eventresult = (Event*) malloc(CHUNK_SIZE * sizeof(Event));
 
     s2_tid = H5Tcreate(H5T_COMPOUND, sizeof(Event));

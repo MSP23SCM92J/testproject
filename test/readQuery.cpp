@@ -24,10 +24,10 @@
 std::vector<int> result;
 
 // Helper function
-int64_t binarySSearch(ChunkAttr* data, int target, int dataSize) {
-    int64_t left = 0;
-    int64_t right = dataSize - 1;
-    int64_t mid = -1;
+int64_t binarySSearch(ChunkAttr* data, __uint64_t target, __uint64_t dataSize) {
+    __uint64_t left = 0;
+    __uint64_t right = dataSize - 1;
+    __uint64_t mid = -1;
     while (left <= right) {
         mid = left + (right - left) / 2;
         if (data[mid].start <= target && target <= data[mid].end) {
@@ -43,7 +43,7 @@ int64_t binarySSearch(ChunkAttr* data, int target, int dataSize) {
     return mid;
 }
 
-void testReadFromDataset(const char* DATASET_NAME, std::pair<int64_t, int64_t> range, const char* H5FILE_NAME){
+void testReadFromDataset(const char* DATASET_NAME, std::pair<__uint64_t, __uint64_t> range, const char* H5FILE_NAME){
 
     std::vector<Event> resultEvents;
     hid_t file, dataset, space, dataspace, s2_tid;
@@ -100,9 +100,10 @@ void testReadFromDataset(const char* DATASET_NAME, std::pair<int64_t, int64_t> r
             break;
         }
     }
+
     // chunksToRetrieve.first = binarySSearch(attribute_data, range.first, ndims);
     // chunksToRetrieve.second = binarySSearch(attribute_data, range.second, ndims);
-    // std::cout<<chunksToRetrieve.first<<" "<<chunksToRetrieve.second<<std::endl;
+    std::cout << chunksToRetrieve.first << "\t" << chunksToRetrieve.second << std::endl;
 
     // Check for the range of requested query of chunks are not found
     if(chunksToRetrieve.second == -1 || chunksToRetrieve.first == -1){
@@ -187,17 +188,14 @@ void testReadFromDataset(const char* DATASET_NAME, std::pair<int64_t, int64_t> r
         free(eventresult);
    }
 
-
-    H5Sclose(memspace);
     free(attribute_data);
+    H5Sclose(memspace);
     H5Aclose(attribute_id);
     H5Tclose(attribute_type);
     H5Tclose(s2_tid);
     H5Dclose(dataset);
     H5Fclose(file);
-    
 
-    // std::cout << resultEvents.size() << std::endl;
     if(resultEvents.size()!=0){
         if(resultEvents[0].timeStamp == range.first && resultEvents[resultEvents.size()-1].timeStamp == range.second){
             result.push_back(1);
@@ -206,7 +204,6 @@ void testReadFromDataset(const char* DATASET_NAME, std::pair<int64_t, int64_t> r
             result.push_back(0);
         }
     }
-    
     return;
 }
 
