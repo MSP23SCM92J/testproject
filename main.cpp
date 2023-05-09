@@ -12,7 +12,7 @@
 #define H5FILE_NAME "data.h5"
 #define LENGTH      10
 #define RANK        1
-#define FILE_NAME "input2.txt"
+#define FILE_NAME "inpm,mut1.txt"
 #define DEBUG       0
 #define CHUNK_SIZE 10000
 
@@ -32,17 +32,15 @@ int main(int argc, char** argv) {
     }
 
     // Append to dataset
-    /*
-    status = appendToDataset(FILE_NAME, DATASET_NAME, H5FILE_NAME);
-    if(!status)
-    {
-        std::cout<<"\nData appended to file sucessfully!\n"<<std::endl;   
-    }
-    else
-    {
-        std::cout<<"\nError occured while appending data to dataset\n"<<std::endl;
-    }
-    */
+    // status = appendToDataset(FILE_NAME, DATASET_NAME, H5FILE_NAME);
+    // if(!status)
+    // {
+    //     std::cout<<"\nData appended to file sucessfully!\n"<<std::endl;   
+    // }
+    // else
+    // {
+    //     std::cout<<"\nError occured while appending data to dataset\n"<<std::endl;
+    // }
 
     // Read Min and Max attribute from dataset
     std::pair<__uint64_t, __uint64_t> p = readDatasetRange(DATASET_NAME,H5FILE_NAME);
@@ -67,7 +65,7 @@ int main(int argc, char** argv) {
     */
 
     // // Parallel reads
-    testReadOperation();
+    // testReadOperation();
 
     return 0;
 }
