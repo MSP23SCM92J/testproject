@@ -101,10 +101,11 @@ int writeToDataset(std::vector<Event> storyChunk, const char* FILE_NAME, const c
 
     hsize_t attrcount = 0;
     hsize_t iter = 0;
+    hsize_t chunk_size = CHUNK_SIZE;
     for (iter = 0; iter < dim[0]; iter += CHUNK_SIZE) {
         // space_start[0] = iter;
         if(dim[0] - iter < CHUNK_SIZE){
-            slab_count[0] = dim[0] - iter;
+            chunk_size = dim[0] - iter;
             // mspace = H5Screate_simple(DATASET_RANK, slab_count, NULL);
             // status = H5Sselect_hyperslab(mspace, H5S_SELECT_SET, slab_start, NULL, slab_count, NULL);
         }
@@ -112,7 +113,8 @@ int writeToDataset(std::vector<Event> storyChunk, const char* FILE_NAME, const c
         // status = H5Dwrite(dataset, s1_tid, mspace, space, H5P_DEFAULT, &eventBuffer[iter]);
 
         attrBuffer[attrcount].start = eventBuffer[iter].timeStamp;
-        attrBuffer[attrcount].end = eventBuffer[iter + slab_count[0] - 1].timeStamp;
+        attrBuffer[attrcount].end = eventBuffer[iter + chunk_size - 1].timeStamp;
+        std::cout<<attrBuffer[attrcount].start<<"\t"<<attrBuffer[attrcount].end<<std::endl;
         attrcount++;
     }
     
