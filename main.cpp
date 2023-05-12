@@ -13,7 +13,7 @@
 #define H5FILE_NAME "data.h5"
 #define LENGTH      10
 #define RANK        1
-#define FILE_NAME "input1.txt"
+#define FILE_NAME "story2GB.txt"
 #define DEBUG       0
 #define CHUNK_SIZE 1000
 
@@ -36,9 +36,6 @@ void writetofile(){
         storyChunk.push_back(e);
     }
     filePointer.close();    
-    for(int i=0;i<10;i++){
-        std::cout<<storyChunk[i].timeStamp<<"\t"<<storyChunk[i].data<<"\n";
-    }
     int status;
     
     //Write to dataset
@@ -53,15 +50,15 @@ void writetofile(){
     }
 
     // Append to dataset
-    // status = appendToDataset(storyChunk, FILE_NAME, DATASET_NAME, H5FILE_NAME);
-    // if(!status)
-    // {
-    //     std::cout<<"\nData appended to file sucessfully!\n"<<std::endl;   
-    // }
-    // else
-    // {
-    //     std::cout<<"\nError occured while appending data to dataset\n"<<std::endl;
-    // }
+//     status = appendToDataset(storyChunk, FILE_NAME, DATASET_NAME, H5FILE_NAME);
+//     if(!status)
+//     {
+//         std::cout<<"\nData appended to file sucessfully!\n"<<std::endl;   
+//     }
+//     else
+//     {
+//         std::cout<<"\nError occured while appending data to dataset\n"<<std::endl;
+//     }
 }
 
 int main(int argc, char** argv) {
@@ -84,12 +81,13 @@ int main(int argc, char** argv) {
         std::cout << e.size() << std::endl;
         std::cout << e[0].timeStamp << std::endl;
         std::cout << e[e.size()-1].timeStamp << std::endl;
-    }else{
+    }
+    else{
         std::cout << "Empty result vector!\n";
     }
 
     // // Parallel reads
-    testReadOperation();
+    // testReadOperation();
 
     return 0;
 }

@@ -92,23 +92,24 @@ int writeToDataset(std::vector<Event> storyChunk, const char* FILE_NAME, const c
     */
     hsize_t slab_start[] = {0};
     hsize_t space_start[] = {0};
-    hsize_t slab_count[1] = {CHUNK_SIZE};
+    // hsize_t slab_count[1] = {CHUNK_SIZE};
+    hsize_t slab_count[1] = {dim[0]};
     mspace = H5Screate_simple(DATASET_RANK, slab_count, NULL);
     status = H5Sselect_hyperslab(mspace, H5S_SELECT_SET, slab_start, NULL, slab_count, NULL);
+    status = H5Sselect_hyperslab(space, H5S_SELECT_SET, space_start, NULL, slab_count, NULL);
+    status = H5Dwrite(dataset, s1_tid, mspace, space, H5P_DEFAULT, &eventBuffer[0]);
 
     hsize_t attrcount = 0;
     hsize_t iter = 0;
     for (iter = 0; iter < dim[0]; iter += CHUNK_SIZE) {
-        space_start[0] = iter;
+        // space_start[0] = iter;
         if(dim[0] - iter < CHUNK_SIZE){
             slab_count[0] = dim[0] - iter;
-
-            // TODO: check mspace declaration
-            mspace = H5Screate_simple(DATASET_RANK, slab_count, NULL);
-            status = H5Sselect_hyperslab(mspace, H5S_SELECT_SET, slab_start, NULL, slab_count, NULL);
+            // mspace = H5Screate_simple(DATASET_RANK, slab_count, NULL);
+            // status = H5Sselect_hyperslab(mspace, H5S_SELECT_SET, slab_start, NULL, slab_count, NULL);
         }
-        status = H5Sselect_hyperslab(space, H5S_SELECT_SET, space_start, NULL, slab_count, NULL);
-        status = H5Dwrite(dataset, s1_tid, mspace, space, H5P_DEFAULT, &eventBuffer[iter]);
+        // status = H5Sselect_hyperslab(space, H5S_SELECT_SET, space_start, NULL, slab_count, NULL);
+        // status = H5Dwrite(dataset, s1_tid, mspace, space, H5P_DEFAULT, &eventBuffer[iter]);
 
         attrBuffer[attrcount].start = eventBuffer[iter].timeStamp;
         attrBuffer[attrcount].end = eventBuffer[iter + slab_count[0] - 1].timeStamp;
@@ -116,8 +117,8 @@ int writeToDataset(std::vector<Event> storyChunk, const char* FILE_NAME, const c
     }
     
     /*
-    * Create dataspace for the ChunkMetadata attribute.
-    */
+     * Create dataspace for the ChunkMetadata attribute.
+     */
     herr_t ret;
 
     at_tid = H5Tcreate(H5T_COMPOUND, sizeof(ChunkAttr));
@@ -128,14 +129,14 @@ int writeToDataset(std::vector<Event> storyChunk, const char* FILE_NAME, const c
     attr = H5Screate(H5S_SIMPLE);
     ret  = H5Sset_extent_simple(attr, CHUNK_META_ATTR_RANK, adim, NULL);
     /*
-    * Create array attribute and write array attribute.
-    */
+     * Create array attribute and write array attribute.
+     */
     attr1 = H5Acreate2(dataset, ATTR_CHUNKMETADATA, at_tid, attr, H5P_DEFAULT, H5P_DEFAULT);
     ret = H5Awrite(attr1, at_tid, attrBuffer);
 
     /*
-    * Create and write to Min and Max attribute.
-    */
+     * Create and write to Min and Max attribute.
+     */
     at_tid = H5Tcreate(H5T_COMPOUND, sizeof(ChunkAttr));
     adim[0] = {1};
     attr = H5Screate_simple(1, adim, NULL);
@@ -147,8 +148,8 @@ int writeToDataset(std::vector<Event> storyChunk, const char* FILE_NAME, const c
     ret = H5Awrite(max_attr, H5T_NATIVE_ULONG, &eventBuffer[dim[0]-1].timeStamp);
 
     /*
-    * Release resources
-    */
+     * Release resources
+     */
     free(attrBuffer);
     free(eventBuffer);
     H5Sclose(mspace);
