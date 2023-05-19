@@ -4,8 +4,10 @@
 
 
 typedef struct ChunkAttr {
-    __uint64_t start;
-    __uint64_t end;
+    uint64_t startTimeStamp;
+    uint64_t endTimeStamp;
+    uint datasetIndex;
+    uint totalChunkEvents;
 }ChunkAttr;
 
 #endif // CHUNK_ATTR_H
